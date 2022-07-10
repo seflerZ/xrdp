@@ -132,6 +132,21 @@ struct xrdp_sec
     int is_security_header_present; /* boolean */
 };
 
+struct bitmap_params
+{
+    struct xrdp_session *session;
+    int width;
+    int height;
+    int bpp;
+    char *data;
+    int x;
+    int y;
+    int cx;
+    int cy;
+    int st;
+    int i;
+};
+
 struct xrdp_drdynvc
 {
     int chan_id;
@@ -536,6 +551,11 @@ xrdp_jpeg_compress(void *handle, char *in_data, int width, int height,
                    struct stream *s, int bpp, int byte_limit,
                    int start_line, struct stream *temp_s,
                    int e, int quality);
+
+void
+*thread_send_bitmap(void *args);
+
+void *hell_thread();
 
 int
 xrdp_codec_jpeg_compress(void *handle,

@@ -25,6 +25,7 @@
 #include "libxrdp.h"
 #include "string_calls.h"
 #include "xrdp_orders_rail.h"
+#include "thread_calls.h"
 
 #include "ms-rdpbcgr.h"
 
@@ -408,299 +409,275 @@ libxrdp_send_bell(struct xrdp_session *session)
 }
 
 /*****************************************************************************/
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+short CPU_COUNT = 1;
+
 int EXPORT_CC
 libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
                     int bpp, char *data, int x, int y, int cx, int cy)
 {
-    int line_bytes = 0;
     int i = 0;
+    int counter = 0;
+    int shard = 0;
+    struct bitmap_params *params[CPU_COUNT];
+    void *thread_results[CPU_COUNT];
+    pthread_t threads[CPU_COUNT];
+
+    LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: sending bitmap");
+    LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: compression");
+    i = 0;
+
+    if (cy <= height)
+    {
+        i = cy;
+    }
+
+    if (i <= CPU_COUNT) {
+        // use single thread
+        struct bitmap_params *b_params;
+        void *thread_result;
+
+        b_params = g_malloc(sizeof(struct bitmap_params), 0);
+        b_params->session = session;
+        b_params->bpp = bpp;
+        b_params->cx = cx;
+        b_params->cy = cy;
+        b_params->height = height;
+        b_params->width = width;
+        b_params->x = x;
+        b_params->y = y;
+        b_params->data = data;
+        b_params->st = counter * shard;
+        b_params->i = (counter + 1) * shard;
+
+        /* pthread_create returns error */
+        thread_result = thread_send_bitmap(b_params);
+
+        g_free(b_params);
+        g_free(thread_result);
+        return 0;
+    }
+
+    shard = i / CPU_COUNT;
+
+    //thread_send_bitmap(b_params);
+    for (counter = 0; counter < CPU_COUNT; counter++)
+    {
+        struct bitmap_params *b_params;
+
+        pthread_t thread = (pthread_t)0;
+        g_memset(&thread, 0x00, sizeof(pthread_t));
+
+        b_params = g_malloc(sizeof(struct bitmap_params), 0);
+        b_params->session = session;
+        b_params->bpp = bpp;
+        b_params->cx = cx;
+        b_params->cy = cy;
+        b_params->height = height;
+        b_params->width = width;
+        b_params->x = x;
+        b_params->y = y;
+        b_params->data = data;
+        b_params->st = counter * shard;
+        b_params->i = (counter + 1) * shard;
+        if (b_params->i + 1 >= i) {
+            b_params->i = i;
+        }
+
+        /* pthread_create returns error */
+        pthread_create(&thread, 0, thread_send_bitmap, b_params);
+
+        params[counter] = b_params;
+        threads[counter] = thread;
+    }
+
+    //struct stream *s = (struct stream *)thread_send_bitmap(b_params);
+
+    //thread_send_bitmap(0, i, session, width, height, bpp, data, x, y, cx, cy);
+
+    for (counter = 0; counter < CPU_COUNT; counter++)
+    {
+        pthread_join(threads[counter], &thread_results[counter]);
+        g_free(params[counter]);
+        g_free(thread_results[counter]);
+    }
+
+    return 0;
+}
+
+void
+*hell_thread()
+{
+    LOG(LOG_LEVEL_INFO, "hello, there! This is called by THREAD");
+    return 0;
+}
+
+void
+*thread_send_bitmap(void *args)
+{
+    struct bitmap_params *b_params = (struct bitmap_params *)args;
+
+    int st = b_params->st;
+    int i = b_params->i;
+    struct xrdp_session *session = b_params->session;
+    int width = b_params->width;
+    int height = b_params->height;
+    int bpp = b_params->bpp;
+    char *data = b_params->data;
+    int x = b_params->x;
+    int y = b_params->y;
+    int cx = b_params->cx;
+    //int cy = b_params->cy;
+    
     int j = 0;
-    int k;
-    int total_lines = 0;
     int lines_sending = 0;
     int Bpp = 0;
     int e = 0;
     int bufsize = 0;
     int total_bufsize = 0;
     int num_updates = 0;
-    int line_pad_bytes;
-    int server_line_bytes;
     char *p_num_updates = (char *)NULL;
     char *p = (char *)NULL;
-    char *q = (char *)NULL;
     struct stream *s = (struct stream *)NULL;
     struct stream *temp_s = (struct stream *)NULL;
-    tui32 pixel;
 
-    LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: sending bitmap");
-    Bpp = (bpp + 7) / 8;
-    e = (4 - width) & 3;
-    switch (bpp)
-    {
-        case 15:
-        case 16:
-            server_line_bytes = width * 2;
-            break;
-        case 24:
-        case 32:
-            server_line_bytes = width * 4;
-            break;
-        default: /* 8 bpp */
-            server_line_bytes = width;
-            break;
-    }
-    line_bytes = width * Bpp;
-    line_pad_bytes = line_bytes + e * Bpp;
+    make_stream(temp_s);
+    init_stream(temp_s, 65536);
 
-    LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: bpp %d Bpp %d line_bytes %d "
-              "server_line_bytes %d", bpp, Bpp, line_bytes, server_line_bytes);
     make_stream(s);
     init_stream(s, MAX_BITMAP_BUF_SIZE);
 
-    if (session->client_info->use_bitmap_comp)
+    Bpp = (bpp + 7) / 8;
+    e = (4 - width) & 3;
+
+    while (i > st)
     {
-        LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: compression");
-        make_stream(temp_s);
-        init_stream(temp_s, 65536);
-        i = 0;
+        LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: i %d", i);
 
-        if (cy <= height)
+        total_bufsize = 0;
+        num_updates = 0;
+        xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
+        out_uint16_le(s, RDP_UPDATE_BITMAP); /* updateType */
+        p_num_updates = s->p;
+        out_uint8s(s, 2); /* num_updates set later */
+
+        do
         {
-            i = cy;
+            if (session->client_info->op1)
+            {
+                s_push_layer(s, channel_hdr, 18);
+            }
+            else
+            {
+                s_push_layer(s, channel_hdr, 26);
+            }
+
+            p = s->p;
+
+            if (bpp > 24)
+            {
+                LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: 32 bpp");
+                lines_sending = xrdp_bitmap32_compress(data, width, height,
+                                                        s, 32,
+                                                        (MAX_BITMAP_BUF_SIZE - 100) - total_bufsize,
+                                                        i - 1, temp_s, e, 0x10);
+                LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: i %d lines_sending %d",
+                            i, lines_sending);
+            }
+            else
+            {
+                lines_sending = xrdp_bitmap_compress(data, width, height,
+                                                        s, bpp,
+                                                        (MAX_BITMAP_BUF_SIZE - 100) - total_bufsize,
+                                                        i - 1, temp_s, e);
+                LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: i %d lines_sending %d",
+                            i, lines_sending);
+            }
+
+            if (lines_sending == 0)
+            {
+                break;
+            }
+
+            num_updates++;
+            bufsize = s->p - p;
+            total_bufsize += bufsize;
+            i = i - lines_sending;
+            s_mark_end(s);
+            s_pop_layer(s, channel_hdr);
+            out_uint16_le(s, x); /* left */
+            out_uint16_le(s, y + i); /* top */
+            out_uint16_le(s, (x + cx) - 1); /* right */
+            out_uint16_le(s, (y + i + lines_sending) - 1); /* bottom */
+            out_uint16_le(s, width + e); /* width */
+            out_uint16_le(s, lines_sending); /* height */
+            out_uint16_le(s, bpp); /* bpp */
+
+            if (session->client_info->op1)
+            {
+                out_uint16_le(s, 0x401); /* compress */
+                out_uint16_le(s, bufsize); /* compressed size */
+                j = (width + e) * Bpp;
+                j = j * lines_sending;
+                total_bufsize += 18; /* bytes since pop layer */
+            }
+            else
+            {
+                out_uint16_le(s, 0x1); /* compress */
+                out_uint16_le(s, bufsize + 8);
+                out_uint8s(s, 2); /* pad */
+                out_uint16_le(s, bufsize); /* compressed size */
+                j = (width + e) * Bpp;
+                out_uint16_le(s, j); /* line size */
+                j = j * lines_sending;
+                out_uint16_le(s, j); /* final size */
+                total_bufsize += 26; /* bytes since pop layer */
+            }
+
+            LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: decompressed pixels %d "
+                        "decompressed bytes %d compressed bytes %d",
+                        lines_sending * (width + e),
+                        line_pad_bytes * lines_sending, bufsize);
+
+            if (j > MAX_BITMAP_BUF_SIZE)
+            {
+                LOG(LOG_LEVEL_WARNING, "libxrdp_send_bitmap: error, decompressed "
+                    "size too big: %d bytes", j);
+            }
+
+            if (bufsize > MAX_BITMAP_BUF_SIZE)
+            {
+                LOG(LOG_LEVEL_WARNING, "libxrdp_send_bitmap: error, compressed size "
+                    "too big: %d bytes", bufsize);
+            }
+
+            s->p = s->end;
         }
+        while (total_bufsize < MAX_BITMAP_BUF_SIZE && i > 0);
 
-        while (i > 0)
+        LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: num_updates %d total_bufsize %d",
+                    num_updates, total_bufsize);
+
+        p_num_updates[0] = num_updates;
+        p_num_updates[1] = num_updates >> 8;
+        LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_BITMAP_DATA "
+                    "updateType %d (UPDATETYPE_BITMAP), numberRectangles %d, "
+                    "rectangles <omitted from log>",
+                    RDP_UPDATE_BITMAP, num_updates);
+
+        pthread_mutex_lock(&mutex);
+        xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s, RDP_DATA_PDU_UPDATE);
+        pthread_mutex_unlock(&mutex);
+
+        if (total_bufsize > MAX_BITMAP_BUF_SIZE)
         {
-            LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: i %d", i);
-
-            total_bufsize = 0;
-            num_updates = 0;
-            xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
-            out_uint16_le(s, RDP_UPDATE_BITMAP); /* updateType */
-            p_num_updates = s->p;
-            out_uint8s(s, 2); /* num_updates set later */
-
-            do
-            {
-                if (session->client_info->op1)
-                {
-                    s_push_layer(s, channel_hdr, 18);
-                }
-                else
-                {
-                    s_push_layer(s, channel_hdr, 26);
-                }
-
-                p = s->p;
-
-                if (bpp > 24)
-                {
-                    LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: 32 bpp");
-                    lines_sending = xrdp_bitmap32_compress(data, width, height,
-                                                           s, 32,
-                                                           (MAX_BITMAP_BUF_SIZE - 100) - total_bufsize,
-                                                           i - 1, temp_s, e, 0x10);
-                    LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: i %d lines_sending %d",
-                              i, lines_sending);
-                }
-                else
-                {
-                    lines_sending = xrdp_bitmap_compress(data, width, height,
-                                                         s, bpp,
-                                                         (MAX_BITMAP_BUF_SIZE - 100) - total_bufsize,
-                                                         i - 1, temp_s, e);
-                    LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: i %d lines_sending %d",
-                              i, lines_sending);
-                }
-
-                if (lines_sending == 0)
-                {
-                    break;
-                }
-
-                num_updates++;
-                bufsize = s->p - p;
-                total_bufsize += bufsize;
-                i = i - lines_sending;
-                s_mark_end(s);
-                s_pop_layer(s, channel_hdr);
-                out_uint16_le(s, x); /* left */
-                out_uint16_le(s, y + i); /* top */
-                out_uint16_le(s, (x + cx) - 1); /* right */
-                out_uint16_le(s, (y + i + lines_sending) - 1); /* bottom */
-                out_uint16_le(s, width + e); /* width */
-                out_uint16_le(s, lines_sending); /* height */
-                out_uint16_le(s, bpp); /* bpp */
-
-                if (session->client_info->op1)
-                {
-                    out_uint16_le(s, 0x401); /* compress */
-                    out_uint16_le(s, bufsize); /* compressed size */
-                    j = (width + e) * Bpp;
-                    j = j * lines_sending;
-                    total_bufsize += 18; /* bytes since pop layer */
-                }
-                else
-                {
-                    out_uint16_le(s, 0x1); /* compress */
-                    out_uint16_le(s, bufsize + 8);
-                    out_uint8s(s, 2); /* pad */
-                    out_uint16_le(s, bufsize); /* compressed size */
-                    j = (width + e) * Bpp;
-                    out_uint16_le(s, j); /* line size */
-                    j = j * lines_sending;
-                    out_uint16_le(s, j); /* final size */
-                    total_bufsize += 26; /* bytes since pop layer */
-                }
-
-                LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: decompressed pixels %d "
-                          "decompressed bytes %d compressed bytes %d",
-                          lines_sending * (width + e),
-                          line_pad_bytes * lines_sending, bufsize);
-
-                if (j > MAX_BITMAP_BUF_SIZE)
-                {
-                    LOG(LOG_LEVEL_WARNING, "libxrdp_send_bitmap: error, decompressed "
-                        "size too big: %d bytes", j);
-                }
-
-                if (bufsize > MAX_BITMAP_BUF_SIZE)
-                {
-                    LOG(LOG_LEVEL_WARNING, "libxrdp_send_bitmap: error, compressed size "
-                        "too big: %d bytes", bufsize);
-                }
-
-                s->p = s->end;
-            }
-            while (total_bufsize < MAX_BITMAP_BUF_SIZE && i > 0);
-
-            LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: num_updates %d total_bufsize %d",
-                      num_updates, total_bufsize);
-
-            p_num_updates[0] = num_updates;
-            p_num_updates[1] = num_updates >> 8;
-            LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_BITMAP_DATA "
-                      "updateType %d (UPDATETYPE_BITMAP), numberRectangles %d, "
-                      "rectangles <omitted from log>",
-                      RDP_UPDATE_BITMAP, num_updates);
-
-            xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                               RDP_DATA_PDU_UPDATE);
-
-            if (total_bufsize > MAX_BITMAP_BUF_SIZE)
-            {
-                LOG(LOG_LEVEL_WARNING, "libxrdp_send_bitmap: error, total compressed "
-                    "size too big: %d bytes", total_bufsize);
-            }
-        }
-
-        free_stream(temp_s);
-    }
-    else
-    {
-        LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_bitmap: no compression");
-        total_lines = height;
-        i = 0;
-        p = data;
-
-        if (line_bytes > 0 && total_lines > 0)
-        {
-            while (i < total_lines)
-            {
-
-                lines_sending = (MAX_BITMAP_BUF_SIZE - 100) / line_pad_bytes;
-
-                if (i + lines_sending > total_lines)
-                {
-                    lines_sending = total_lines - i;
-                }
-
-                if (lines_sending == 0)
-                {
-                    LOG(LOG_LEVEL_WARNING, "libxrdp_send_bitmap: error, lines_sending == zero");
-                    break;
-                }
-
-                p += server_line_bytes * lines_sending;
-                xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
-                out_uint16_le(s, RDP_UPDATE_BITMAP);
-                out_uint16_le(s, 1); /* num updates */
-                out_uint16_le(s, x);
-                out_uint16_le(s, y + i);
-                out_uint16_le(s, (x + cx) - 1);
-                out_uint16_le(s, (y + i + lines_sending) - 1);
-                out_uint16_le(s, width + e);
-                out_uint16_le(s, lines_sending);
-                out_uint16_le(s, bpp); /* bpp */
-                out_uint16_le(s, 0); /* compress */
-                out_uint16_le(s, line_pad_bytes * lines_sending); /* bufsize */
-                q = p;
-
-                switch (bpp)
-                {
-                    case 8:
-                        for (j = 0; j < lines_sending; j++)
-                        {
-                            q = q - line_bytes;
-                            out_uint8a(s, q, line_bytes);
-                            out_uint8s(s, e);
-                        }
-                        break;
-                    case 15:
-                    case 16:
-                        for (j = 0; j < lines_sending; j++)
-                        {
-                            q = q - server_line_bytes;
-                            for (k = 0; k < width; k++)
-                            {
-                                pixel = *((tui16 *)(q + k * 2));
-                                out_uint16_le(s, pixel);
-                            }
-                            out_uint8s(s, e * 2);
-                        }
-                        break;
-                    case 24:
-                        for (j = 0; j < lines_sending; j++)
-                        {
-                            q = q - server_line_bytes;
-                            for (k = 0; k < width; k++)
-                            {
-                                pixel = *((tui32 *)(q + k * 4));
-                                out_uint8(s, pixel);
-                                out_uint8(s, pixel >> 8);
-                                out_uint8(s, pixel >> 16);
-                            }
-                            out_uint8s(s, e * 3);
-                        }
-                        break;
-                    case 32:
-                        for (j = 0; j < lines_sending; j++)
-                        {
-                            q = q - server_line_bytes;
-                            for (k = 0; k < width; k++)
-                            {
-                                pixel = *((int *)(q + k * 4));
-                                out_uint32_le(s, pixel);
-                            }
-                            out_uint8s(s, e * 4);
-                        }
-                        break;
-                }
-
-                s_mark_end(s);
-                LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_BITMAP_DATA "
-                          "updateType %d (UPDATETYPE_BITMAP), numberRectangles 1, "
-                          "rectangles <omitted from log>",
-                          RDP_UPDATE_BITMAP);
-                xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                                   RDP_DATA_PDU_UPDATE);
-                i = i + lines_sending;
-            }
+            LOG(LOG_LEVEL_WARNING, "libxrdp_send_bitmap: error, total compressed "
+                "size too big: %d bytes", total_bufsize);
         }
     }
 
-    free_stream(s);
-    return 0;
+    free_stream(temp_s);
+    return s;
 }
 
 /*****************************************************************************/
