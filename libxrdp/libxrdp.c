@@ -410,7 +410,7 @@ libxrdp_send_bell(struct xrdp_session *session)
 
 /*****************************************************************************/
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-short CPU_COUNT = 1;
+short CPU_COUNT = 4;
 
 int EXPORT_CC
 libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
@@ -480,7 +480,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
         b_params->data = data;
         b_params->st = counter * shard;
         b_params->i = (counter + 1) * shard;
-        if (b_params->i + 1 >= i) {
+        if (b_params->i + (shard - 1) >= i) {
             b_params->i = i;
         }
 

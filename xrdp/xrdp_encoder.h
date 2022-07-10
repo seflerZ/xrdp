@@ -61,6 +61,12 @@ struct xrdp_enc_data_done
     int cy;
 };
 
+struct thread_enc_params
+{
+    struct xrdp_encoder *self;
+    XRDP_ENC_DATA *enc;
+};
+
 typedef struct xrdp_enc_data_done XRDP_ENC_DATA_DONE;
 
 struct xrdp_encoder *
@@ -69,5 +75,8 @@ void
 xrdp_encoder_delete(struct xrdp_encoder *self);
 THREAD_RV THREAD_CC
 proc_enc_msg(void *arg);
+
+void
+*thread_enc(void *args);
 
 #endif

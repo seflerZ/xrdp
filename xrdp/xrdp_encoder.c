@@ -451,6 +451,8 @@ process_enc_h264(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 /**
  * Encoder thread main loop
  *****************************************************************************/
+int CPU_COUNT = 4;
+
 THREAD_RV THREAD_CC
 proc_enc_msg(void *arg)
 {
@@ -515,6 +517,12 @@ proc_enc_msg(void *arg)
 
         if (g_is_wait_obj_set(event_to_proc))
         {
+            struct thread_enc_params *params[CPU_COUNT];
+            void *thread_results[CPU_COUNT];
+            pthread_t threads[CPU_COUNT];
+            int counter = 0;
+            int c2 = 0;
+
             /* clear it right away */
             g_reset_wait_obj(event_to_proc);
             /* get first msg */
@@ -523,16 +531,52 @@ proc_enc_msg(void *arg)
             tc_mutex_unlock(mutex);
             while (enc != 0)
             {
-                /* do work */
-                self->process_enc(self, enc);
-                /* get next msg */
-                tc_mutex_lock(mutex);
-                enc = (XRDP_ENC_DATA *) fifo_remove_item(fifo_to_proc);
-                tc_mutex_unlock(mutex);
+                counter = 0;
+
+                while (counter < CPU_COUNT && enc != 0)
+                {
+                    /* do work */
+                    threads[counter] = (pthread_t)0;
+                    g_memset(&threads[counter], 0x00, sizeof(pthread_t));
+
+                    params[counter] = g_malloc(sizeof(struct thread_enc_params), 0);
+                    params[counter]->self = self;
+                    params[counter]->enc = enc;
+
+                    pthread_create(&threads[counter], 0, thread_enc, params[counter]);
+
+                    //self->process_enc(self, enc);
+                    /* get next msg */
+                    tc_mutex_lock(mutex);
+                    enc = (XRDP_ENC_DATA *) fifo_remove_item(fifo_to_proc);
+                    tc_mutex_unlock(mutex);
+
+                    LOG(LOG_LEVEL_INFO, "proc_enc_msg: thread created-%d", counter);
+
+                    counter++;
+                }
+
+                //pthread_join(threads[counter], &thread_results[counter]);
+                //g_free(params[counter]);
+
+                for (c2 = 0; c2 < counter; c2++) {
+                    pthread_join(threads[c2], &thread_results[c2]);
+                    g_free(params[c2]);
+                }
             }
         }
 
     } /* end while (cont) */
     LOG_DEVEL(LOG_LEVEL_DEBUG, "proc_enc_msg: thread exit");
+    return 0;
+}
+
+void
+*thread_enc(void *args) 
+{
+    struct thread_enc_params *params = (struct thread_enc_params *)args;
+
+    params->self->process_enc(params->self, params->enc);
+
     return 0;
 }
