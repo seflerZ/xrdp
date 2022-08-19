@@ -126,7 +126,7 @@ xrdp_encoder_x264_encode(void *handle, int session,
             xe->x264_params.i_threads = 1;
             xe->x264_params.i_width = width;
             xe->x264_params.i_height = height;
-            xe->x264_params.i_fps_num = 24;
+            xe->x264_params.i_fps_num = 60;
             xe->x264_params.i_fps_den = 1;
             //xe->x264_params.b_cabac = 1;
             //xe->x264_params.i_bframe = 0;
