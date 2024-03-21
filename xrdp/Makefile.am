@@ -14,7 +14,9 @@ AM_CPPFLAGS = \
   -I$(top_srcdir)/common \
   -I$(top_srcdir)/libipm \
   -I$(top_srcdir)/libxrdp \
-  $(IMLIB2_CFLAGS)
+  $(IMLIB2_CFLAGS) \
+  $(GLIB2_CFLAGS) \
+  $(IBUS_CFLAGS)
 
 XRDP_EXTRA_LIBS =
 XRDP_EXTRA_SOURCES =
@@ -69,6 +71,8 @@ xrdp_SOURCES = \
   xrdp_wm.c \
   xrdp_egfx.c \
   xrdp_egfx.h \
+  xrdp_ibus.c \
+  xrdp_ibus.h \
   $(XRDP_EXTRA_SOURCES)
 
 xrdp_LDADD = \
@@ -76,7 +80,9 @@ xrdp_LDADD = \
   $(top_builddir)/libipm/libipm.la \
   $(top_builddir)/libxrdp/libxrdp.la \
   $(IMLIB2_LIBS) \
-  $(XRDP_EXTRA_LIBS)
+  $(XRDP_EXTRA_LIBS) \
+  $(GLIB2_LIBS) \
+  $(IBUS_LIBS)
 
 xrdpsysconfdir=$(sysconfdir)/xrdp
 

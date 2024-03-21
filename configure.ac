@@ -396,6 +396,14 @@ then
     [AC_MSG_ERROR([please install libfuse-dev or fuse-devel])])
 fi
 
+# checking for glib
+PKG_CHECK_MODULES([GLIB2], [glib-2.0 >= 2.56], [],
+  [AC_MSG_ERROR([please install libglib2.0-dev or glib2.0-devel])])
+
+# checking for iBus
+PKG_CHECK_MODULES([IBUS], [ibus-1.0 >= 1.1.0], [],
+  [AC_MSG_ERROR([please install libibus1.0-dev or ibus1.0-devel])])
+
 # checking for fdk aac
 if test "x$enable_fdkaac" = "xyes"
 then

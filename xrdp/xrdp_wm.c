@@ -28,6 +28,7 @@
 #include "ms-rdpbcgr.h"
 #include "log.h"
 #include "string_calls.h"
+#include "xrdp_ibus.h"
 
 
 
@@ -1710,6 +1711,9 @@ xrdp_wm_key_unicode(struct xrdp_wm *self, int device_flags, int unicode)
             return 0;
         }
     }
+
+    // Send as a unicode character to iBus directly
+    xrdp_ibus_send_unicode(unicode);
 
     return 0;
 }
