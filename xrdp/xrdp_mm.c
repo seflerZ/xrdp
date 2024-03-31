@@ -2111,6 +2111,28 @@ xrdp_mm_drdynvc_data(intptr_t id, int chan_id, char *data, int bytes)
     return trans_write_copy(trans);
 }
 
+int
+xrdp_mm_send_unicode_to_chansrv(struct xrdp_mm *self,
+                                int key_down,
+                                uint32_t unicode)
+{
+    struct stream *s = trans_get_out_s(self->chan_trans, 8192);
+    if (s == NULL)
+    {
+        return 1;
+    }
+
+    out_uint32_le(s, 0); /* version */
+    out_uint32_le(s, 24); /* size */
+    out_uint32_le(s, 21); /* msg id */
+    out_uint32_le(s, 16); /* size */
+    out_uint32_le(s, key_down);
+    out_uint32_le(s, unicode);
+    s_mark_end(s);
+    
+    return trans_write_copy(self->chan_trans);
+}
+
 /*****************************************************************************/
 /* open message from channel server going to client */
 static int

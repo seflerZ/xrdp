@@ -485,6 +485,10 @@ server_palette(struct xrdp_mod *mod, int *palette);
 int
 server_msg(struct xrdp_mod *mod, const char *msg, int code);
 int
+xrdp_mm_send_unicode_to_chansrv(struct xrdp_mm *self,
+                                int key_down,
+                                uint32_t unicode);
+int
 server_set_clip(struct xrdp_mod *mod, int x, int y, int cx, int cy);
 int
 server_reset_clip(struct xrdp_mod *mod);

@@ -40,6 +40,7 @@
 #include "chansrv_config.h"
 #include "xrdp_sockets.h"
 #include "audin.h"
+#include "input.h"
 
 #include "ms-rdpbcgr.h"
 
@@ -66,6 +67,7 @@ int g_cliprdr_chan_id = -1; /* cliprdr */
 int g_rdpsnd_chan_id = -1;  /* rdpsnd  */
 int g_rdpdr_chan_id = -1;   /* rdpdr   */
 int g_rail_chan_id = -1;    /* rail    */
+int g_input_chan_id = -1;   /* unicode input */
 
 char *g_exec_name;
 tbus g_exec_event = 0;
@@ -350,6 +352,7 @@ process_message_channel_setup(struct stream *s)
     g_rdpsnd_chan_id = -1;
     g_rdpdr_chan_id = -1;
     g_rail_chan_id = -1;
+    g_input_chan_id = -1;
     LOG_DEVEL(LOG_LEVEL_DEBUG, "process_message_channel_setup:");
     in_uint16_le(s, num_chans);
     LOG_DEVEL(LOG_LEVEL_DEBUG, "process_message_channel_setup: num_chans %d",
@@ -419,6 +422,7 @@ process_message_channel_setup(struct stream *s)
     }
 
     audin_init();
+    xrdp_input_init();
 
     return rv;
 }
@@ -818,6 +822,34 @@ chansrv_drdynvc_send_data(int chan_id, const char *data, int data_bytes)
     return 0;
 }
 
+static int
+process_message_unicode_key_press(struct stream *s)
+{
+    int rv = 0;
+    int key_down;
+    uint32_t unicode;
+
+    LOG_DEVEL(LOG_LEVEL_DEBUG, "process_message_unicode_keypress:");
+    if (!s_check_rem(s, 8))
+    {
+        rv = 1;
+    }
+    else
+    {
+        in_uint32_le(s, key_down);
+        in_uint32_le(s, unicode);
+
+        LOG_DEVEL(LOG_LEVEL_DEBUG, "process_message_unicode_keypress: received unicode %i", unicode);
+        
+        if (key_down)
+        {
+            xrdp_input_send_unicode(unicode);
+        }
+    }
+
+    return rv;
+}
+
 /*****************************************************************************/
 /* returns error */
 static int
@@ -869,6 +901,9 @@ process_message(void)
                 break;
             case 19: /* drdynvc data */
                 rv = process_message_drdynvc_data(s);
+                break;
+            case 21: /* Unicode key press */
+                rv = process_message_unicode_key_press(s);
                 break;
             default:
                 LOG_DEVEL(LOG_LEVEL_ERROR, "process_message: unknown msg %d", id);

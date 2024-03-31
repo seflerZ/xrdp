@@ -15,11 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * The iBus adapter.
  */
 
-void
-xrdp_ibus_send_unicode(int code);
+#if !defined(INPUT_H)
+#define INPUT_H
 
-void
-xrdp_ibus_init();
+#include "arch.h"
+#include "parse.h"
+
+int
+xrdp_input_send_unicode(uint32_t unicode);
+
+int
+xrdp_input_init();
+
+int
+xrdp_input_send_unicode(uint32_t unicode);
+
+int
+xrdp_input_destory();
+
+#endif

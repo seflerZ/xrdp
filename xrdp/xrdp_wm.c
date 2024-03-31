@@ -28,8 +28,6 @@
 #include "ms-rdpbcgr.h"
 #include "log.h"
 #include "string_calls.h"
-#include "xrdp_ibus.h"
-
 
 
 /*****************************************************************************/
@@ -1638,6 +1636,54 @@ xrdp_wm_key_sync(struct xrdp_wm *self, int device_flags, int key_flags)
     return 0;
 }
 
+int
+xrdp_wm_send_unicode_to_chansrv(struct xrdp_mm *self, int unicode)
+{
+    struct stream *s;
+    int rv;
+    int length;
+    int total_length;
+    int flags;
+    int id;
+    char *data;
+
+    rv = 0;
+
+    if ((self->chan_trans != 0) && self->chan_trans->status == TRANS_STATUS_UP)
+    {
+        s = trans_get_out_s(self->chan_trans, 8192);
+
+        if (s != 0)
+        {
+            id = 99; // Channel for input
+            flags = 0x11; // Combine first and last
+            length = sizeof(int);
+            data = (char *)&unicode;
+            total_length = length;
+
+            if (total_length < length)
+            {
+                LOG(LOG_LEVEL_WARNING, "WARNING in xrdp_wm_unicode_to_chansrv(): total_len < length");
+                total_length = length;
+            }
+
+            out_uint32_le(s, 0); /* version */
+            out_uint32_le(s, 8 + 8 + 2 + 2 + 2 + 4 + length);
+            out_uint32_le(s, 5); /* msg id */
+            out_uint32_le(s, 8 + 2 + 2 + 2 + 4 + length);
+            out_uint16_le(s, id);
+            out_uint16_le(s, flags);
+            out_uint16_le(s, length);
+            out_uint32_le(s, total_length);
+            out_uint8a(s, data, length);
+            s_mark_end(s);
+            rv = trans_force_write(self->chan_trans);
+        }
+    }
+
+    return rv;
+}
+
 /*****************************************************************************/
 int
 xrdp_wm_key_unicode(struct xrdp_wm *self, int device_flags, int unicode)
@@ -1712,8 +1758,8 @@ xrdp_wm_key_unicode(struct xrdp_wm *self, int device_flags, int unicode)
         }
     }
 
-    // Send as a unicode character to iBus directly
-    xrdp_ibus_send_unicode(unicode);
+    // Forward unicode to chansrv to input method like iBus
+    xrdp_mm_send_unicode_to_chansrv(self->mm, !(device_flags & KBD_FLAG_UP), unicode);
 
     return 0;
 }
