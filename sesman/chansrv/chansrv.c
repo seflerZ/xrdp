@@ -67,7 +67,6 @@ int g_cliprdr_chan_id = -1; /* cliprdr */
 int g_rdpsnd_chan_id = -1;  /* rdpsnd  */
 int g_rdpdr_chan_id = -1;   /* rdpdr   */
 int g_rail_chan_id = -1;    /* rail    */
-int g_input_chan_id = -1;   /* unicode input */
 
 char *g_exec_name;
 tbus g_exec_event = 0;
@@ -333,6 +332,19 @@ send_rail_drawing_orders(char *data, int size)
     return 0;
 }
 
+static int
+process_message_unicode_setup(struct stream *s)
+{
+    return xrdp_input_unicode_init();
+}
+
+// static int
+// process_message_unicode_shutdown(struct stream *s)
+// {
+//     LOG(LOG_LEVEL_INFO, "process_message_unicode_shutdown: received ibus input shutdown message");
+//     return xrdp_input_unicode_destory();
+// }
+
 /*****************************************************************************/
 /* returns error */
 static int
@@ -352,7 +364,6 @@ process_message_channel_setup(struct stream *s)
     g_rdpsnd_chan_id = -1;
     g_rdpdr_chan_id = -1;
     g_rail_chan_id = -1;
-    g_input_chan_id = -1;
     LOG_DEVEL(LOG_LEVEL_DEBUG, "process_message_channel_setup:");
     in_uint16_le(s, num_chans);
     LOG_DEVEL(LOG_LEVEL_DEBUG, "process_message_channel_setup: num_chans %d",
@@ -422,7 +433,6 @@ process_message_channel_setup(struct stream *s)
     }
 
     audin_init();
-    xrdp_input_init();
 
     return rv;
 }
@@ -823,7 +833,7 @@ chansrv_drdynvc_send_data(int chan_id, const char *data, int data_bytes)
 }
 
 static int
-process_message_unicode_key_press(struct stream *s)
+process_message_unicode_data(struct stream *s)
 {
     int rv = 0;
     int key_down;
@@ -902,9 +912,15 @@ process_message(void)
             case 19: /* drdynvc data */
                 rv = process_message_drdynvc_data(s);
                 break;
-            case 21: /* Unicode key press */
-                rv = process_message_unicode_key_press(s);
+            case 21: /* unicode setup */
+                rv = process_message_unicode_setup(s);
                 break;
+            case 23: /* unicode key event */
+                rv = process_message_unicode_data(s);
+                break;
+            // case 25: /* unicode key event */
+            //     rv = process_message_unicode_shutdown(s);
+            //     break;
             default:
                 LOG_DEVEL(LOG_LEVEL_ERROR, "process_message: unknown msg %d", id);
                 break;

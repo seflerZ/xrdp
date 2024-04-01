@@ -11,6 +11,8 @@
 
 static IBusBus *bus;
 static IBusEngine *g_engine;
+// This is the engine name enabled before unicode engine enabled
+// static const gchar *ori_name;
 static int id = 0;
 
 int
@@ -81,14 +83,27 @@ xrdp_input_ibus_create_engine(IBusFactory *factory,
 int
 xrdp_input_enable()
 {
+    IBusEngineDesc *desc;
+    const gchar *name;
+
     if (!bus)
     {
         return 1;
     }
 
-    ibus_bus_set_global_engine_async(bus, "XrdpIme", -1, NULL, NULL, NULL);
-    LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched successfully");
+    desc = ibus_bus_get_global_engine(bus);
+    name = ibus_engine_desc_get_name (desc);
+    if (!g_ascii_strcasecmp(name, "XrdpIme"))
+    {
+        return 0;
+    }
 
+    if (!ibus_bus_set_global_engine(bus, "XrdpIme"))
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_input_enable: input method enable failed");
+        return 1;
+    }
+    
     return 0;
 }
 
@@ -101,7 +116,7 @@ xrdp_input_main_loop()
     IBusEngineDesc *desc;
     THREAD_RV rv = 0;
 
-    LOG(LOG_LEVEL_INFO, "xrdp_input_main_loop: Entering iBus loop");
+    LOG(LOG_LEVEL_INFO, "xrdp_input_main_loop: Entering ibus loop");
 
     g_signal_connect(bus, "disconnected", G_CALLBACK(xrdp_input_ibus_disconnect), NULL);
 
@@ -134,11 +149,6 @@ xrdp_input_main_loop()
     ibus_component_add_engine(component, desc);
     ibus_bus_register_component(bus, component);
 
-    if (xrdp_input_enable())
-    {
-        return rv;
-    }
-
     ibus_main();
 
     g_object_unref(desc);
@@ -149,17 +159,30 @@ xrdp_input_main_loop()
 }
 
 int
-xrdp_input_destory()
+xrdp_input_unicode_destory()
 {
+    // LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus destory");
+    // if (ori_name)
+    // {
+    //     LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus engine rolling back to origin: %s", ori_name);
+    //     ibus_bus_set_global_engine(bus, ori_name);
+    // }
+
+    g_object_unref(g_engine);
+    g_object_unref(bus);
+
     return 0;
 }
 
 int
-xrdp_input_init()
+xrdp_input_unicode_init()
 {
-    if (bus != NULL)
+    // IBusEngineDesc *ori_engine;
+
+    if (bus)
     {
-        // Already initialized
+        // Already initialized, just re-enable it
+        xrdp_input_enable();
         return 0;
     }
 
@@ -176,7 +199,25 @@ xrdp_input_init()
 
     LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: iBus connected");
 
+    // ori_engine = ibus_bus_get_global_engine_async_finish(bus, NULL, NULL);
+    // if (ori_engine)
+    // {
+    //     ori_name = ibus_engine_desc_get_name(ori_engine);
+    //     LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: got origin engine name %s", ori_name);
+    // }
+
     tc_thread_create(xrdp_input_main_loop, NULL);
 
-    return 0;
+    // session may not be ready, repeat until input method enabled
+    sleep(5);
+
+    if (!xrdp_input_enable())
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched successfully");
+        return 0;
+    }
+
+    LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched failed");
+
+    return 1;
 }
