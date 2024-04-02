@@ -1641,7 +1641,7 @@ int
 xrdp_wm_key_unicode(struct xrdp_wm *self, int device_flags, int unicode)
 {
     int index;
-
+    
     for (index = XR_MIN_KEY_CODE; index < XR_MAX_KEY_CODE; index++)
     {
         if (unicode == self->keymap.keys_noshift[index].chr)

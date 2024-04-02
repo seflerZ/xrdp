@@ -12,13 +12,57 @@
 static IBusBus *bus;
 static IBusEngine *g_engine;
 // This is the engine name enabled before unicode engine enabled
-// static const gchar *ori_name;
+static const gchar *ori_name;
 static int id = 0;
+
+int
+xrdp_input_enable()
+{
+    IBusEngineDesc *desc;
+    const gchar *name;
+
+    if (ori_name)
+    {
+        // already enabled
+        return 0;
+    }
+    
+    if (!bus)
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched failed, ibus not connected");
+        return 1;
+    }
+
+    desc = ibus_bus_get_global_engine(bus);
+    name = ibus_engine_desc_get_name (desc);
+    if (!g_ascii_strcasecmp(name, "XrdpIme"))
+    {
+        return 0;
+    }
+    
+    // remember user's input method, will switch back when disconnect
+    ori_name = name;
+
+    if (!ibus_bus_set_global_engine(bus, "XrdpIme"))
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_input_enable: input method enable failed");
+        return 1;
+    }
+
+    LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched sucessfully, old input name: %s", ori_name);
+    
+    return 0;
+}
 
 int
 xrdp_input_send_unicode(uint32_t unicode)
 {
     LOG(LOG_LEVEL_INFO, "xrdp_input_send_unicode: received unicode input %i", unicode);
+
+    if (xrdp_input_enable())
+    {
+        return 1;
+    }
 
     gunichar chr = unicode;
     ibus_engine_commit_text(g_engine, ibus_text_new_from_unichar(chr));
@@ -80,33 +124,6 @@ xrdp_input_ibus_create_engine(IBusFactory *factory,
     return engine;
 }
 
-int
-xrdp_input_enable()
-{
-    IBusEngineDesc *desc;
-    const gchar *name;
-
-    if (!bus)
-    {
-        return 1;
-    }
-
-    desc = ibus_bus_get_global_engine(bus);
-    name = ibus_engine_desc_get_name (desc);
-    if (!g_ascii_strcasecmp(name, "XrdpIme"))
-    {
-        return 0;
-    }
-
-    if (!ibus_bus_set_global_engine(bus, "XrdpIme"))
-    {
-        LOG(LOG_LEVEL_INFO, "xrdp_input_enable: input method enable failed");
-        return 1;
-    }
-    
-    return 0;
-}
-
 /*****************************************************************************/
 THREAD_RV THREAD_CC
 xrdp_input_main_loop()
@@ -161,15 +178,19 @@ xrdp_input_main_loop()
 int
 xrdp_input_unicode_destory()
 {
-    // LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus destory");
-    // if (ori_name)
-    // {
-    //     LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus engine rolling back to origin: %s", ori_name);
-    //     ibus_bus_set_global_engine(bus, ori_name);
-    // }
+    LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus input is under destory");
+    if (ori_name)
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus engine rolling back to origin: %s", ori_name);
+        ibus_bus_set_global_engine(bus, ori_name);
+    }
 
     g_object_unref(g_engine);
     g_object_unref(bus);
+
+    ori_name = NULL;
+    bus = NULL;
+    g_engine = NULL;
 
     return 0;
 }
@@ -177,7 +198,7 @@ xrdp_input_unicode_destory()
 int
 xrdp_input_unicode_init()
 {
-    // IBusEngineDesc *ori_engine;
+    int retry = 10;
 
     if (bus)
     {
@@ -199,25 +220,24 @@ xrdp_input_unicode_init()
 
     LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: iBus connected");
 
-    // ori_engine = ibus_bus_get_global_engine_async_finish(bus, NULL, NULL);
-    // if (ori_engine)
-    // {
-    //     ori_name = ibus_engine_desc_get_name(ori_engine);
-    //     LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: got origin engine name %s", ori_name);
-    // }
-
     tc_thread_create(xrdp_input_main_loop, NULL);
 
     // session may not be ready, repeat until input method enabled
-    sleep(5);
-
-    if (!xrdp_input_enable())
+    while (retry--)
     {
-        LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched successfully");
-        return 0;
+        if (ibus_bus_get_global_engine(bus))
+        {
+            break;
+        }
+
+        sleep(1);
     }
 
-    LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched failed");
+    if (retry == 0)
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: failed to connect to ibus");
+        return 1;
+    }
 
     return 1;
 }

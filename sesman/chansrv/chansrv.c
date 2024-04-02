@@ -338,12 +338,11 @@ process_message_unicode_setup(struct stream *s)
     return xrdp_input_unicode_init();
 }
 
-// static int
-// process_message_unicode_shutdown(struct stream *s)
-// {
-//     LOG(LOG_LEVEL_INFO, "process_message_unicode_shutdown: received ibus input shutdown message");
-//     return xrdp_input_unicode_destory();
-// }
+static int
+process_message_unicode_shutdown(struct stream *s)
+{
+    return xrdp_input_unicode_destory();
+}
 
 /*****************************************************************************/
 /* returns error */
@@ -918,9 +917,9 @@ process_message(void)
             case 23: /* unicode key event */
                 rv = process_message_unicode_data(s);
                 break;
-            // case 25: /* unicode key event */
-            //     rv = process_message_unicode_shutdown(s);
-            //     break;
+            case 25: /* unicode shut down */
+                rv = process_message_unicode_shutdown(s);
+                break;
             default:
                 LOG_DEVEL(LOG_LEVEL_ERROR, "process_message: unknown msg %d", id);
                 break;

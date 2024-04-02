@@ -383,13 +383,6 @@ xrdp_caps_process_input(struct xrdp_rdp *self, struct stream *s,
         self->client_info.use_fast_path &= ~2;
     }
 
-    // If client supports unicode input, initialize unicode input loop
-    // if (inputFlags & INPUT_FLAG_UNICODE)
-    // {
-    //     LOG(LOG_LEVEL_INFO, "xrdp_caps_process_input: client unicode capability found.");
-    //     self->client_info.unicode_input |= 0x01;
-    // }
-
     return 0;
 }
 
