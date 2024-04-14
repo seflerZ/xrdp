@@ -1,3 +1,22 @@
+/**
+ * xrdp: A Remote Desktop Protocol server.
+ *
+ * Copyright (C) Jay Sorg 2009-2013
+ * Copyright (C) Laxmikant Rashinkar 2009-2012
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #if defined(HAVE_CONFIG_H)
 #include <config_ac.h>
 #endif
@@ -29,7 +48,7 @@ xrdp_input_enable()
     
     if (!bus)
     {
-        LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: input method switched failed, ibus not connected");
+        LOG(LOG_LEVEL_ERROR, "xrdp_ibus_init: input method switched failed, ibus not connected");
         return 1;
     }
 
@@ -45,7 +64,7 @@ xrdp_input_enable()
 
     if (!ibus_bus_set_global_engine(bus, "XrdpIme"))
     {
-        LOG(LOG_LEVEL_INFO, "xrdp_input_enable: input method enable failed");
+        LOG(LOG_LEVEL_ERROR, "xrdp_input_enable: input method enable failed");
         return 1;
     }
 
@@ -57,7 +76,7 @@ xrdp_input_enable()
 int
 xrdp_input_send_unicode(uint32_t unicode)
 {
-    LOG(LOG_LEVEL_INFO, "xrdp_input_send_unicode: received unicode input %i", unicode);
+    LOG(LOG_LEVEL_DEBUG, "xrdp_input_send_unicode: received unicode input %i", unicode);
 
     if (xrdp_input_enable())
     {
@@ -96,10 +115,6 @@ gboolean engine_process_key_event_cb(IBusEngine *engine,
                                      guint keycode,
                                      guint state)
 {
-    if(state & IBUS_RELEASE_MASK) {
-        return FALSE;
-    }
-
     // Pass the keyboard event to system
     return FALSE;
 }
@@ -115,7 +130,7 @@ xrdp_input_ibus_create_engine(IBusFactory *factory,
                              path,
                              ibus_bus_get_connection(bus));
 
-    LOG(LOG_LEVEL_INFO, "xrdp_input_ibus_create_engine: Creating IM Engine with name:%s and id:%d\n", engine_name, ++id);
+    LOG(LOG_LEVEL_DEBUG, "xrdp_input_ibus_create_engine: Creating IM Engine with name:%s and id:%d\n", engine_name, ++id);
 
     g_signal_connect(engine, "process-key-event", G_CALLBACK(engine_process_key_event_cb), NULL);
     g_signal_connect(engine, "enable", G_CALLBACK(xrdp_input_ibus_engine_enable), NULL);
@@ -133,7 +148,7 @@ xrdp_input_main_loop()
     IBusEngineDesc *desc;
     THREAD_RV rv = 0;
 
-    LOG(LOG_LEVEL_INFO, "xrdp_input_main_loop: Entering ibus loop");
+    LOG(LOG_LEVEL_DEBUG, "xrdp_input_main_loop: Entering ibus loop");
 
     g_signal_connect(bus, "disconnected", G_CALLBACK(xrdp_input_ibus_disconnect), NULL);
 
@@ -145,14 +160,14 @@ xrdp_input_main_loop()
 
     ibus_factory_add_engine(factory, "XrdpIme", IBUS_TYPE_ENGINE);
 
-    component = ibus_component_new("org.freedesktop.IBus.XrdpIme",
-                                       "Xrdp input method",
-                                       "1.1",
-                                       "MIT",
-                                       "seflerZ",
-                                       "fake_icon",
-                                       "/exec/fake_path",
-                                       "xrdpime");
+    component = ibus_component_new("org.freedesktop.IBus.XrdpIme", // name
+                                       "Xrdp input method", // description
+                                       "1.1", // version
+                                       "MIT", // license
+                                       "seflerZ", // author
+                                       "fake_page", // homepage
+                                       "/exec/fake_path", // cmd
+                                       "xrdpime"); // text domain
 
     desc = ibus_engine_desc_new("XrdpIme",
                                        "unicode input method for xrdp",
@@ -161,7 +176,7 @@ xrdp_input_main_loop()
                                        "MIT",
                                        "seflerZ",
                                        "fake_icon.png",
-                                       "default");
+                                       "default"); // layout
 
     ibus_component_add_engine(component, desc);
     ibus_bus_register_component(bus, component);
@@ -178,7 +193,7 @@ xrdp_input_main_loop()
 int
 xrdp_input_unicode_destory()
 {
-    LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus input is under destory");
+    LOG(LOG_LEVEL_DEBUG, "xrdp_input_unicode_destory: ibus input is under destory");
     if (ori_name)
     {
         LOG(LOG_LEVEL_INFO, "xrdp_input_unicode_destory: ibus engine rolling back to origin: %s", ori_name);
@@ -207,14 +222,14 @@ xrdp_input_unicode_init()
         return 0;
     }
 
-    LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: Initializing the iBus engine");
+    LOG(LOG_LEVEL_DEBUG, "xrdp_ibus_init: Initializing the iBus engine");
     ibus_init();
     bus = ibus_bus_new();
     g_object_ref_sink(bus);
 
     if (!ibus_bus_is_connected(bus))
     {
-        LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: Connect to iBus failed");
+        LOG(LOG_LEVEL_ERROR, "xrdp_ibus_init: Connect to iBus failed");
         return 1;
     }
 
@@ -235,7 +250,7 @@ xrdp_input_unicode_init()
 
     if (retry == 0)
     {
-        LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: failed to connect to ibus");
+        LOG(LOG_LEVEL_ERROR, "xrdp_ibus_init: failed to connect to ibus");
         return 1;
     }
 

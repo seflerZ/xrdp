@@ -382,7 +382,6 @@ xrdp_caps_process_input(struct xrdp_rdp *self, struct stream *s,
     {
         self->client_info.use_fast_path &= ~2;
     }
-
     return 0;
 }
 

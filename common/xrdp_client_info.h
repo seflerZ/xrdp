@@ -154,7 +154,6 @@ struct xrdp_client_info
 
     int keyboard_type;
     int keyboard_subtype;
-    // int use_unicode_input; /* 0 = no , 1 = yes */
 
     int png_codec_id;
     int png_prop_len;

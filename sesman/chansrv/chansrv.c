@@ -332,12 +332,14 @@ send_rail_drawing_orders(char *data, int size)
     return 0;
 }
 
+/*****************************************************************************/
 static int
 process_message_unicode_setup(struct stream *s)
 {
     return xrdp_input_unicode_init();
 }
 
+/*****************************************************************************/
 static int
 process_message_unicode_shutdown(struct stream *s)
 {
@@ -831,6 +833,7 @@ chansrv_drdynvc_send_data(int chan_id, const char *data, int data_bytes)
     return 0;
 }
 
+/*****************************************************************************/
 static int
 process_message_unicode_data(struct stream *s)
 {

@@ -2154,6 +2154,8 @@ xrdp_mm_drdynvc_data(intptr_t id, int chan_id, char *data, int bytes)
     return trans_write_copy(trans);
 }
 
+/*****************************************************************************/
+/* open message from channel server going to client */
 int
 xrdp_mm_send_unicode_to_chansrv(struct xrdp_mm *self,
                                 int key_down,
