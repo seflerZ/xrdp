@@ -196,7 +196,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
     self->xrdp_encoder_term = g_create_wait_obj(buf);
     if (client_info->gfx)
     {
-        self->frames_in_flight = 30;
+        self->frames_in_flight = 10;
         self->max_compressed_bytes = 4245728;
     }
     else

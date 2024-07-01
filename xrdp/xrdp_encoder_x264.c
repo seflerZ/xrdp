@@ -123,7 +123,7 @@ xrdp_encoder_x264_encode(void *handle, int session,
         {
             //x264_param_default_preset(&(xe->x264_params), "superfast", "zerolatency");
             x264_param_default_preset(&(xe->x264_params), "ultrafast", "zerolatency");
-            xe->x264_params.i_threads = 1;
+            xe->x264_params.i_threads = 8;
             xe->x264_params.i_width = width;
             xe->x264_params.i_height = height;
             xe->x264_params.i_fps_num = 60;

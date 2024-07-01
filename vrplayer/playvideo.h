@@ -40,7 +40,7 @@ class PlayVideo : public QObject
                            QMutex *sendMutex = 0,
                            void *channel = 0,
                            int stream_id = 101,
-                           int fps = 24);
+                           int fps = 60);
 
         //void onMediaSeek(int value);
         //void setVcrOp(int op);
