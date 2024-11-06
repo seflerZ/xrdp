@@ -1205,9 +1205,9 @@ xrdp_caps_send_demand_active(struct xrdp_rdp *self)
         caps_count++;
         out_uint16_le(s, CAPSTYPE_FRAME_ACKNOWLEDGE);
         out_uint16_le(s, CAPSTYPE_FRAME_ACKNOWLEDGE_LEN);
-        out_uint32_le(s, 10); /* 10 frames in flight */
+        out_uint32_le(s, 6); /* 6 frames in flight */
         LOG_DEVEL(LOG_LEVEL_TRACE, "xrdp_caps_send_demand_active: Server Capability "
-                  "CAPSTYPE_FRAME_ACKNOWLEDGE = 10 frames");
+                  "CAPSTYPE_FRAME_ACKNOWLEDGE = 6 frames");
 
         /* surface commands */
         caps_count++;
