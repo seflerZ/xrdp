@@ -132,11 +132,11 @@ xrdp_encoder_x264_encode(void *handle, int session,
             //xe->x264_params.b_cabac = 1;
             //xe->x264_params.i_bframe = 0;
             xe->x264_params.rc.i_rc_method = X264_RC_CRF;
-            xe->x264_params.rc.f_rf_constant = 21;
-	        xe->x264_params.rc.f_rf_constant_max = 30;
+            xe->x264_params.rc.f_rf_constant = 25;
+	        xe->x264_params.rc.f_rf_constant_max = 35;
             //x264_param_apply_profile(&(xe->x264_params), "high");
-            //x264_param_apply_profile(&(xe->x264_params), "main");
-            x264_param_apply_profile(&(xe->x264_params), "ultrafast");
+            x264_param_apply_profile(&(xe->x264_params), "main");
+            //x264_param_apply_profile(&(xe->x264_params), "ultrafast");
             xe->x264_enc_han = x264_encoder_open(&(xe->x264_params));
             if (xe->x264_enc_han == 0)
             {

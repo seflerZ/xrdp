@@ -222,6 +222,8 @@ xrdp_input_unicode_init()
         return 0;
     }
 
+    sleep(3);
+
     LOG(LOG_LEVEL_DEBUG, "xrdp_ibus_init: Initializing the iBus engine");
     ibus_init();
     bus = ibus_bus_new();

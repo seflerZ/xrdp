@@ -196,7 +196,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
     self->xrdp_encoder_term = g_create_wait_obj(buf);
     if (client_info->gfx)
     {
-        self->frames_in_flight = 6;
+        self->frames_in_flight = 15;
         self->max_compressed_bytes = 4245728;
     }
     else
@@ -205,7 +205,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->max_compressed_bytes = client_info->max_fastpath_frag_bytes & ~15;
     }
     /* make sure frames_in_flight is at least 1 */
-    self->frames_in_flight = MAX(self->frames_in_flight, 1);
+    self->frames_in_flight = MAX(self->frames_in_flight, 15);
 
     /* create thread to process messages */
     tc_thread_create(proc_enc_msg, self);
