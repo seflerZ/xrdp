@@ -239,10 +239,17 @@ xrdp_input_unicode_init(void)
     bus = ibus_bus_new();
     g_object_ref_sink(bus);
 
-    if (!ibus_bus_is_connected(bus))
-    {
-        LOG(LOG_LEVEL_ERROR, "xrdp_ibus_init: Connect to iBus failed");
-        return 1;
+    cnt = 0;
+    while (!ibus_bus_is_connected(bus))
+    {    
+        LOG(LOG_LEVEL_WARNING, "xrdp_ibus_init: waiting ibus connection");
+
+        if (cnt >= 10) {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ibus_init: Connect to iBus failed");
+            return 1;
+        }
+
+        usleep(500 * 1000); // half a second
     }
 
     LOG(LOG_LEVEL_INFO, "xrdp_ibus_init: iBus connected");
